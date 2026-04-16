@@ -1,70 +1,26 @@
-use std::fs::File;
 use std::io::Read;
-use std::sync::mpsc::{self, Receiver};
-use std::thread;
+use std::net::TcpListener;
 
-// messages.txt:
-// Do you have what it takes to be an engineer at TheStartup™?
-// Are you willing to work 80 hours a week in hopes that your 0.001% equity is worth something?
-// Can you say "synergy" and "democratize" with a straight face?
-// Are you prepared to eat top ramen at your desk 3 meals a day?
-// end
+// curl http://localhost:42069/coffee
+// curl -X POST -H "Content-Type: application/json" -d '{"flavor":"dark mode"}' http://localhost:42069/coffee
+
+// HTTP Format:
+// CRLF: \r\n
+
+// start-line CRLF
+// *( field-line CRLF )
+// CRLF
+// [ message-body ]
 
 fn main() {
-    let file_attempt = File::open("./messages.txt");
-    let f;
+    let listner = TcpListener::bind("127.0.0.1:42069");
 
-    match file_attempt {
-        Ok(result) => f = result,
-        Err(_) => return,
-    }
-
-    let receiver = get_lines_channel(f);
-    receiver.iter().for_each(|line| print!("{line}"));
-}
-
-fn get_lines_channel<R: Read + Send + 'static>(mut reader: R) -> Receiver<String> {
-    let (tx, rx) = mpsc::channel();
-    let mut buffer = [0u8; 8]; // 8 bytes long
-    let mut output = String::new();
-
-    thread::spawn(move || {
-        loop {
-            let r = reader.read(&mut buffer);
-            let n;
-            match r {
-                Ok(read) => {
-                    if read == 0 {
-                        return;
-                    }
-                    n = read
-                }
-                Err(_) => return,
-            }
-
-            let s = std::str::from_utf8(&buffer[..n]);
-            match s {
-                Ok(str) => {
-                    if str.contains("\n") {
-                        let result = str.find('\n');
-                        match result {
-                            Some(idx) => {
-                                let left = str[..idx].to_string();
-                                let _ = tx.send(format!("{output}{left}").to_string());
-
-                                // Reset output for next one
-                                output = str[idx..].to_string();
-                            }
-                            None => return,
-                        }
-                    } else {
-                        output.push_str(str);
-                    }
-                }
-                Err(_) => return,
+    if let Ok(result) = listner {
+        for stream in result.incoming() {
+            if let Ok(r) = stream {
+                let receiver = get_lines_channel(r);
+                receiver.iter().for_each(|line| print!("{line}"));
             }
         }
-    });
-
-    rx
+    }
 }
