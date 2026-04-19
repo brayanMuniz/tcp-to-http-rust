@@ -1,6 +1,9 @@
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Error, Read};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
+
+pub mod foo;
+use foo::get_lines_channel;
 
 #[derive(Debug)]
 struct Request {
@@ -72,56 +75,35 @@ fn request_from_reader<R: Read + Send + 'static>(reader: R) -> Result<Request, R
     })
 }
 
-fn get_lines_channel<R: Read + Send + 'static>(mut reader: R) -> Receiver<String> {
-    let (tx, rx) = mpsc::channel();
-    let mut buffer = [0u8; 8]; // 8 bytes long
-    let mut output = String::new();
-
-    thread::spawn(move || {
-        loop {
-            let r = reader.read(&mut buffer);
-            let n;
-            match r {
-                Ok(read) => {
-                    if read == 0 {
-                        return;
-                    }
-                    n = read
-                }
-                Err(_) => return,
-            }
-
-            let s = std::str::from_utf8(&buffer[..n]);
-            match s {
-                Ok(str) => {
-                    if str.contains("\r\n") {
-                        let result = str.find("\r\n");
-                        match result {
-                            Some(idx) => {
-                                let left = str[..idx].to_string();
-                                let _ = tx.send(format!("{output}{left}").to_string());
-
-                                // Reset output for next one
-                                output = str[idx..].to_string();
-                            }
-                            None => return,
-                        }
-                    } else {
-                        output.push_str(str);
-                    }
-                }
-                Err(_) => return,
-            }
-        }
-    });
-
-    rx
+#[derive(Debug)]
+struct TestReader {
+    data: Cursor<Vec<u8>>,
+    number_bytes_to_read: u64,
 }
+
+impl TestReader {
+    fn new(data: String, number_bytes_to_read: u64) -> TestReader {
+        TestReader {
+            data: Cursor::new(data.into_bytes()),
+            number_bytes_to_read,
+        }
+    }
+}
+
+impl Read for TestReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // by_ref is used to keep compiler happy
+        self.data.by_ref().take(self.number_bytes_to_read).read(buf)
+    }
+}
+
+// WARNING: Currently fails because get_lines_channel is not fully implemented
 
 #[test]
 fn read_single_line() {
     let single_request = "GET / HTTP/1.1\r\n".to_string();
-    let receiver = get_lines_channel(Cursor::new(single_request));
+    let reader = TestReader::new(single_request, 1);
+    let receiver = get_lines_channel(reader);
 
     let val = receiver.iter().next();
     if let Some(val) = val {
