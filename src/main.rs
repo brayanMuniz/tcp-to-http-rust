@@ -1,7 +1,6 @@
 use std::net::TcpListener;
 
-pub mod foo;
-use foo::get_lines_channel;
+use tcp_to_http_rust::get_lines_channel;
 
 // curl http://localhost:42069/coffee
 // curl -X POST -H "Content-Type: application/json" -d '{"flavor":"dark mode"}' http://localhost:42069/coffee
