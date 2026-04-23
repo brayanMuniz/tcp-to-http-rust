@@ -13,6 +13,11 @@ use tcp_to_http_rust::get_lines_channel;
 // CRLF
 // [ message-body ]
 
+// This is just for my reference
+// -- Scroll the documentation window [b]ack / [f]orward
+// ['<C-b>'] = cmp.mapping.scroll_docs(-4),
+// ['<C-f>'] = cmp.mapping.scroll_docs(4),
+
 fn main() {
     let listner = TcpListener::bind("127.0.0.1:42069");
 
